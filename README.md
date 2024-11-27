@@ -33,78 +33,107 @@ This project focuses on building a **personalised travel recommendation system**
   - Populated tables with test data, including:
     - 86 UK destinations.
     - Activities tagged with themes, seasons, and types.
-    - Travel times from a central location (Staines) to each destination.
+    - Travel times from a central location to each destination.
 
 ---
 
 ### **2. Filtering System**
 #### **1st Level Filtering**
-- Captures basic user inputs through the survey:
-  - **Travel Mode**: Users select car, train, or flight.
-  - **Travel Time Constraints**: Time limits by each travel mode.
-- SQL queries implemented to:
-  - Filter destinations by travel mode and time constraints.
-  - Return destinations matching user-specified criteria.
+- The first level of filtering captures basic user inputs provided through a survey. It includes:
+  - **Travel Mode**: Users can select one or more options among car, train, and flight.
+  - **Travel Time Constraints**: Maximum time limits set.
+- The filtering logic dynamically processes user inputs using the following steps:
+  1. **Unpivot User Inputs**: JSON-formatted responses are unpivoted to transform multiple travel modes into a structured format.
+  2. **Filter by Travel Mode and Time Constraints**: Destinations are filtered based on user preferences for travel mode and travel time.
+
+#### SQL Query for 1st Level Filtering 
+
+```sql
+WITH split_mode AS (
+    SELECT
+        user_id,
+        JSON_UNQUOTE(JSON_EXTRACT(CONCAT('["', REPLACE(travel_mode, ',', '","'), '"]'), '$[0]')) AS mode1,
+        JSON_UNQUOTE(JSON_EXTRACT(CONCAT('["', REPLACE(travel_mode, ',', '","'), '"]'), '$[1]')) AS mode2,
+        JSON_UNQUOTE(JSON_EXTRACT(CONCAT('["', REPLACE(travel_mode, ',', '","'), '"]'), '$[2]')) AS mode3
+    FROM survey_responses
+),
+unpivot AS (
+    SELECT user_id, travel_mode
+    FROM (
+        SELECT user_id, mode1 AS travel_mode FROM split_mode
+        UNION ALL
+        SELECT user_id, mode2 AS travel_mode FROM split_mode
+        UNION ALL
+        SELECT user_id, mode3 AS travel_mode FROM split_mode
+    ) AS combined
+    WHERE travel_mode IS NOT NULL
+)
+SELECT tm.destination_id, tm.travel_mode, tm.travel_time
+FROM unpivot un
+JOIN travel_mode tm ON tm.travel_mode = un.travel_mode
+WHERE tm.travel_time <= un.travel_time_preference
+  AND un.user_id = 'user_1';
+```
 
 #### **2nd Level Filtering**
-- User selects:
-  - Preferred nations (e.g., England, Scotland, Wales).
-  - Preferred destination types (e.g., City, Coast).
-- SQL query enhancements include:
-  - Parsing JSON-like responses into individual elements.
-  - Filtering destinations based on the combination of nation and destination type.
-- Created reusable CTEs for:
-  - Splitting multi-valued fields (e.g., comma-separated nations or types).
-  - Efficiently joining user preferences with destination data.
+- The second level of filtering enables users to specify additional preferences:
+  - **Nations**: Countries such as England, Scotland, or Wales.
+  - **Destination Types**: Categories like City, Coast, or Countryside.
 
----
+- This step processes multi-valued user inputs and refines the destinations further:
+  1. **JSON Parsing**: Parses multi-value preferences (e.g., "England, Scotland") into separate elements.
+  2. **CTEs for Reusability**: Uses Common Table Expressions (CTEs) to clean and transform the data.
+  3. **Destination Matching**: Matches the parsed preferences with destination data to narrow down results.
 
-### **3. Query Highlights**
-#### Destination Filtering by User Preferences
-Filters destinations by combining travel mode, time, nation, and destination type constraints.
+#### SQL Query for 2nd Level Filtering
 
 ```sql
 WITH split_nation AS (
-    SELECT 
-        user_id, 
+    SELECT
+        user_id,
         TRIM(JSON_UNQUOTE(JSON_EXTRACT(CONCAT('["', REPLACE(nation, ',', '","'), '"]'), '$[0]'))) AS nation1,
         TRIM(JSON_UNQUOTE(JSON_EXTRACT(CONCAT('["', REPLACE(nation, ',', '","'), '"]'), '$[1]'))) AS nation2
-    FROM user_responses
-    WHERE user_id = 'user_1'
+    FROM second_filtering
 ),
 expanded_nation AS (
     SELECT user_id, nation1 AS nation FROM split_nation
     UNION ALL
     SELECT user_id, nation2 AS nation FROM split_nation
+),
+filtered_nation AS (
+    SELECT user_id, nation
+    FROM expanded_nation
     WHERE nation IS NOT NULL
 ),
 split_type AS (
-    SELECT 
-        user_id, 
+    SELECT
+        user_id,
         TRIM(JSON_UNQUOTE(JSON_EXTRACT(CONCAT('["', REPLACE(destination_type, ',', '","'), '"]'), '$[0]'))) AS type1,
         TRIM(JSON_UNQUOTE(JSON_EXTRACT(CONCAT('["', REPLACE(destination_type, ',', '","'), '"]'), '$[1]'))) AS type2
-    FROM user_responses
-    WHERE user_id = 'user_1'
+    FROM second_filtering
 ),
 expanded_type AS (
     SELECT user_id, type1 AS type FROM split_type
     UNION ALL
     SELECT user_id, type2 AS type FROM split_type
+),
+filtered_type AS (
+    SELECT user_id, type
+    FROM expanded_type
     WHERE type IS NOT NULL
 )
 SELECT 
     fn.user_id, 
-    d.destination_id, 
-    fn.nation, 
-    d.region, 
-    d.destination_type
-FROM expanded_nation fn
-JOIN destinations d
-  ON fn.nation = d.country
-JOIN expanded_type ft
-  ON d.destination_type = ft.type
+    tue.destination_id, 
+    tue.country, 
+    tue.region, 
+    tue.destination_type
+FROM filtered_nation fn
+JOIN user_destinations tue ON fn.nation = tue.country
+JOIN filtered_type ft ON tue.destination_type = ft.type
 WHERE fn.user_id = 'user_1';
 ```
+---
 
 ### **4. Achievements**
 
