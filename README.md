@@ -11,11 +11,30 @@ This project focuses on building a **personalised travel recommendation system**
 ## 🛤️ Objectives
 
 1. **Personalisation**: Recommend destinations and activities based on user-selected preferences and constraints.
-2. **Efficiency**: Design an optimised database and query structure to handle user data effectively.
-3. **Scalability**: Ensure the system can support a growing dataset of destinations, activities, and user inputs.
-4. **Usability**: Develop a user-friendly survey interface for data collection and feedback.
+2. **Efficiency**: Optimise database and query structures to ensure rapid filtering and scalability.
+3. **Scalability**: Design for seamless integration of additional destinations, activities, and themes.
+4. **Usability**: Build a simple yet powerful survey interface, feeding directly into the recommendation engine.
 
 ---
+
+### Data Flow
+1. **Input**: User survey responses (travel modes, time preferences, countries, destination types) collected via Google Forms.
+2. **Processing**:
+   - **1st Level Filtering**: Filters destinations by travel mode and time constraints.
+   - **2nd Level Filtering**: Further narrows down by countries and destination types.
+   - **SQL Techniques**: JSON Parsing, CTEs, UNPIVOT for multi-valued inputs.
+3. **Output**: Final list of recommended destinations tailored to user preferences.
+   
+---
+
+### Tools and Technologies
+- **Database**: MySQL (Relational schema design and SQL query implementation)
+- **Query Testing**: DBeaver
+- **Programming**: Python (future API integration for survey inputs and automation)
+- **Data Sources**: Public datasets (VisitBritain)
+
+--- 
+
 
 ## 🚀 Progress (As of Today)
 
